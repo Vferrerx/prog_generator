@@ -29,6 +29,10 @@
           <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
         </svg>
       </button>
+      <nav class="tabs">
+        <button type="button" class="tab-btn active" id="tabProcessarBtn">Processar PDF</button>
+        <button type="button" class="tab-btn" id="tabOutbackBtn">Outback</button>
+      </nav>
     </div>
   </header>
 
@@ -36,24 +40,18 @@
 
     <section class="card">
       <h2 class="card-title"><span class="step-num">1</span> Programação (PDF)</h2>
+      <p class="card-hint">Você pode selecionar mais de um PDF de uma vez (ex: lotes enviados ao longo da semana) — o processamento e o Excel gerado consolidam todos os arquivos num único total.</p>
 
-      <div id="dropZone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar arquivo PDF">
+      <div id="dropZone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar arquivos PDF">
         <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p class="drop-title">Arraste o PDF aqui</p>
-        <p class="drop-sub">ou <span class="link-like">selecionar PDF</span></p>
-        <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden />
+        <p class="drop-title">Arraste um ou mais PDFs aqui</p>
+        <p class="drop-sub">ou <span class="link-like">selecionar PDFs</span></p>
+        <input type="file" id="pdfInput" accept="application/pdf,.pdf" multiple hidden />
       </div>
 
-      <div id="fileInfo" class="file-info" hidden>
-        <div class="file-info-icon">PDF</div>
-        <div class="file-info-main">
-          <div id="fileName" class="file-info-name"></div>
-          <div id="fileSize" class="file-info-size"></div>
-        </div>
-        <button type="button" id="removeFileBtn" class="btn-icon" title="Remover arquivo">&times;</button>
-      </div>
+      <div id="fileList" class="file-list" hidden></div>
 
       <button type="button" id="btnProcessar" class="btn btn-primary" disabled>Processar programação</button>
 
@@ -65,7 +63,7 @@
     </section>
 
     <section id="summarySection" class="card" hidden>
-      <h2 class="card-title">Resumo do processamento</h2>
+      <h2 class="card-title">Resumo consolidado do processamento</h2>
       <div class="summary-grid">
         <div class="summary-item"><span class="summary-value" id="sumPages">0</span><span class="summary-label">Páginas processadas</span></div>
         <div class="summary-item"><span class="summary-value" id="sumRecords">0</span><span class="summary-label">Registros encontrados</span></div>
@@ -84,7 +82,7 @@
     <section id="autoReturnSection" class="card" hidden>
       <h2 class="card-title">Linhas de retorno criadas automaticamente</h2>
       <p class="card-hint">
-        Rotas cuja transportadora (tabela de referência, ver aba <strong>Configurações</strong>) é elegível para
+        Rotas cuja transportadora (tabela de referência, ver <strong>Configurações</strong>) é elegível para
         retorno e que possuem evidência histórica de retorno ao CD. Essas linhas <strong>não vêm do PDF</strong> —
         foram inferidas a partir do histórico acumulado. Confira o motivo de cada uma antes de gerar o Excel.
       </p>
@@ -93,7 +91,7 @@
 
     <section id="genSection" class="card" hidden>
       <h2 class="card-title"><span class="step-num">2</span> Gerar Excel</h2>
-      <p class="card-hint">O sistema preenche o modelo de Excel preservando colunas, formatação e fórmulas, e divide automaticamente a programação em uma planilha por grupo (conforme a tabela de referência em Configurações), nomeada com a semana do faturamento.</p>
+      <p class="card-hint">O sistema preenche o modelo de Excel preservando colunas, formatação e fórmulas, e divide automaticamente a programação consolidada em uma planilha por grupo (conforme a tabela de referência em Configurações), nomeada com a semana do faturamento.</p>
       <button type="button" id="btnGerar" class="btn btn-primary" disabled>Gerar Excel</button>
       <div id="genStatus" class="gen-status" hidden></div>
       <div id="downloadSection" class="download-section" hidden>
@@ -104,11 +102,100 @@
 
   </main>
 
+  <main class="container" id="pageOutback" hidden>
+
+    <section class="card">
+      <h2 class="card-title"><span class="step-num">1</span> Programação Outback (PDF)</h2>
+      <p class="card-hint">
+        Aba própria para os PDFs de operações Outback/Abbraccio (rotas com código de loja no formato
+        <code>MARCA-LOJA</code>, ex: <code>OUT-PSH</code>). Origem, transportadora e agrupamento de saída vêm de
+        uma tabela de referência separada da aba Processar PDF (ver abaixo) — as duas abas não compartilham essa
+        configuração. Você pode selecionar mais de um PDF de uma vez; o processamento consolida todos num total único.
+      </p>
+
+      <div id="dropZoneOtb" class="dropzone" tabindex="0" role="button" aria-label="Selecionar arquivos PDF Outback">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p class="drop-title">Arraste um ou mais PDFs Outback aqui</p>
+        <p class="drop-sub">ou <span class="link-like">selecionar PDFs</span></p>
+        <input type="file" id="pdfInputOtb" accept="application/pdf,.pdf" multiple hidden />
+      </div>
+
+      <div id="fileListOtb" class="file-list" hidden></div>
+
+      <button type="button" id="btnProcessarOtb" class="btn btn-primary" disabled>Processar programação</button>
+
+      <div id="progressSectionOtb" class="progress-section" hidden>
+        <div class="progress-track"><div id="progressBarOtb" class="progress-bar"></div></div>
+        <div id="progressStatusOtb" class="progress-status">Processando PDF...</div>
+        <div id="progressDetailOtb" class="progress-detail"></div>
+      </div>
+    </section>
+
+    <section id="summarySectionOtb" class="card" hidden>
+      <h2 class="card-title">Resumo consolidado do processamento</h2>
+      <div class="summary-grid">
+        <div class="summary-item"><span class="summary-value" id="sumPagesOtb">0</span><span class="summary-label">Páginas processadas</span></div>
+        <div class="summary-item"><span class="summary-value" id="sumRecordsOtb">0</span><span class="summary-label">Registros encontrados</span></div>
+        <div class="summary-item summary-ok"><span class="summary-value" id="sumValidOtb">0</span><span class="summary-label">Registros válidos</span></div>
+        <div class="summary-item summary-warn"><span class="summary-value" id="sumInvalidOtb">0</span><span class="summary-label">Com inconsistências</span></div>
+        <div class="summary-item"><span class="summary-value" id="sumWarningsOtb">0</span><span class="summary-label">Avisos</span></div>
+        <div class="summary-item summary-auto"><span class="summary-value" id="sumAutoReturnsOtb">0</span><span class="summary-label">Retornos criados</span></div>
+      </div>
+    </section>
+
+    <section id="issuesSectionOtb" class="card" hidden>
+      <h2 class="card-title">Validação</h2>
+      <div id="issuesListOtb" class="issues-list"></div>
+    </section>
+
+    <section id="autoReturnSectionOtb" class="card" hidden>
+      <h2 class="card-title">Linhas de retorno criadas automaticamente</h2>
+      <p class="card-hint">
+        Rotas cuja transportadora (tabela abaixo) é elegível para retorno e que possuem evidência histórica de
+        retorno ao CD. Essas linhas <strong>não vêm do PDF</strong>. O histórico da aba Outback é mantido separado
+        do histórico da aba Processar PDF.
+      </p>
+      <div id="autoReturnListOtb" class="issues-list"></div>
+    </section>
+
+    <section id="genSectionOtb" class="card" hidden>
+      <h2 class="card-title"><span class="step-num">2</span> Gerar Excel</h2>
+      <p class="card-hint">Mesmo modelo de Excel da aba Processar PDF. Todas as rotas Outback cadastradas saem numa única planilha (<code>Tbl_DistrOUTBACK_Sem</code>), nomeada com a semana do faturamento.</p>
+      <button type="button" id="btnGerarOtb" class="btn btn-primary" disabled>Gerar Excel</button>
+      <div id="genStatusOtb" class="gen-status" hidden></div>
+      <div id="downloadSectionOtb" class="download-section" hidden>
+        <div id="downloadListOtb" class="download-list"></div>
+        <button type="button" id="downloadAllBtnOtb" class="btn btn-secondary">Baixar todas</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3 class="card-title">Tabela de referência Outback: Prefixo × CD × Transportadora × Planilha</h3>
+      <p class="card-hint">
+        Não é editável por aqui — para atualizar, edite <code>data/prefixo_cd_transportadora_outback.js</code>.
+        Rotas cujo prefixo não conste aqui usam a origem padrão abaixo e ficam sinalizadas na validação.
+      </p>
+      <div class="fallback-row">
+        <label for="origemFallbackOtb">Origem usada apenas quando o prefixo da rota não consta na tabela:</label>
+        <input type="text" id="origemFallbackOtb" value="NLOC" maxlength="6" />
+      </div>
+      <div class="base-table-wrap ref-table-scroll">
+        <table class="origem-table">
+          <thead><tr><th>Prefixo</th><th>CD de origem</th><th>Transportadora</th><th>Planilha</th></tr></thead>
+          <tbody id="prefixRefTableBodyOtb"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
   <main class="container" id="pageConfig" hidden>
 
     <section class="card">
       <h2 class="card-title">Modelo de Excel</h2>
-      <p class="card-hint">Por padrão o sistema usa o modelo oficial já incorporado. Envie um arquivo apenas se a estrutura da planilha tiver sido alterada.</p>
+      <p class="card-hint">Por padrão o sistema usa o modelo oficial já incorporado (usado pelas duas abas). Envie um arquivo apenas se a estrutura da planilha tiver sido alterada.</p>
       <div class="model-row">
         <label class="btn btn-secondary" for="modelInput">Selecionar Excel modelo</label>
         <input type="file" id="modelInput" accept=".xlsx" hidden />
@@ -119,12 +206,13 @@
     </section>
 
     <section class="card">
-      <h2 class="card-title">Origem e transportadora (rota → CD)</h2>
+      <h2 class="card-title">Origem e transportadora (rota → CD) — aba Processar PDF</h2>
       <p class="card-hint">
         O CD de origem e a transportadora de cada rota vêm exclusivamente da tabela de referência abaixo
         (prefixo alfabético da rota — ex: <code>BA460M</code> → prefixo <code>BA</code>). O sistema não lê mais
         o campo "Transportadora" do PDF para isso. A transportadora é usada apenas para decidir quais rotas
-        são elegíveis à criação automática de linha de retorno ao CD.
+        são elegíveis à criação automática de linha de retorno ao CD. A aba <strong>Outback</strong> usa uma
+        tabela própria, mostrada nela mesma.
       </p>
       <div class="fallback-row">
         <label for="origemFallback">Origem usada apenas quando o prefixo da rota não consta na tabela:</label>
@@ -150,14 +238,15 @@
     </section>
 
     <section class="card">
-      <h3 class="card-title">Regra de carregamento por nomenclatura (DTHCARREG)</h3>
+      <h3 class="card-title">Regra de carregamento por nomenclatura (DTHCARREG) — aba Processar PDF</h3>
       <p class="card-hint">
         Por padrão, a data e hora de carregamento vêm da linha "Carregamento: &lt;dia&gt; HH:MM" de cada bloco do
         PDF (a "preliminar"). Para as combinações de <strong>CD FATURAMENTO</strong> (campo "CD: XX" do PDF) ×
         <strong>nomenclatura da rota</strong> listadas abaixo, o sistema ignora a preliminar e calcula a
         DTHCARREG a partir da <strong>Data de Entrega</strong> da própria rota (dia(s) antes, no horário
         indicado). Combinações que não constam aqui seguem sempre a data de carregamento do PDF. Não é editável
-        por aqui — para atualizar, edite <code>data/regra_carregamento.js</code>.
+        por aqui — para atualizar, edite <code>data/regra_carregamento.js</code>. A aba <strong>Outback</strong>
+        não usa esta regra — sempre segue a preliminar do PDF.
       </p>
       <input type="search" id="regraCarregTableSearch" class="base-search" placeholder="Pesquisar CD faturamento, nomenclatura ou regra..." />
       <div class="base-table-wrap ref-table-scroll">
@@ -171,24 +260,28 @@
     <section class="card">
       <h3 class="card-title">Limitações conhecidas</h3>
       <ul class="limitations-list">
-        <li><strong>Data e hora de carregamento:</strong> por padrão vêm da linha "Carregamento: &lt;dia&gt; HH:MM" de cada bloco do PDF — o dia (2.F a 6.F, Sáb, Dom) é convertido para a data real a partir da Data de Faturamento impressa no topo do documento. As combinações de CD faturamento × nomenclatura cadastradas na tabela acima substituem esse valor pelo cálculo a partir da Data de Entrega; as demais mantêm a preliminar do PDF.</li>
-        <li><strong>Retorno automático ao CD:</strong> só é criado para rotas cuja transportadora (tabela acima) seja elegível e que já possuam evidência histórica de retorno. Rotas novas, ainda sem histórico, não recebem retorno automático — adicione a linha manualmente se necessário.</li>
+        <li><strong>Data e hora de carregamento:</strong> na aba Processar PDF, por padrão vêm da linha "Carregamento: &lt;dia&gt; HH:MM" de cada bloco do PDF — o dia (2.F a 6.F, Sáb, Dom) é convertido para a data real a partir da Data de Faturamento impressa no topo do documento. As combinações de CD faturamento × nomenclatura cadastradas na tabela acima substituem esse valor pelo cálculo a partir da Data de Entrega; as demais mantêm a preliminar do PDF. Na aba Outback, a preliminar do PDF é sempre usada.</li>
+        <li><strong>Retorno automático ao CD:</strong> só é criado para rotas cuja transportadora seja elegível e que já possuam evidência histórica de retorno. Rotas novas, ainda sem histórico, não recebem retorno automático — adicione a linha manualmente se necessário. O histórico das duas abas é mantido separado.</li>
+        <li><strong>Vários PDFs num processamento:</strong> ao selecionar mais de um arquivo, os registros de todos são validados e consolidados juntos (inclusive detecção de duplicados entre arquivos) antes de gerar o Excel.</li>
       </ul>
     </section>
 
   </main>
 
   <footer class="app-footer">
-    <p>Processamento 100% local no navegador nenhum arquivo é enviado a servidores externos.</p>
+    <p>Processamento 100% local no navegador — nenhum arquivo é enviado a servidores externos.</p>
   </footer>
 
 <!-- ExcelJS (biblioteca de leitura/escrita de .xlsx com suporte a formulas reais) -->
 <script src="vendor/exceljs.min.js"></script>
 
-<!-- Tabela de referencia Prefixo x CD x Transportadora (fonte unica de origem/transportadora) -->
+<!-- Tabela de referencia Prefixo x CD x Transportadora - aba Processar PDF -->
 <script src="data/prefixo_cd_transportadora.js"></script>
 
-<!-- Regras de definicao da DTHCARREG por CD faturamento x nomenclatura da rota -->
+<!-- Tabela de referencia Prefixo x CD x Transportadora - aba Outback (separada da acima) -->
+<script src="data/prefixo_cd_transportadora_outback.js"></script>
+
+<!-- Regras de definicao da DTHCARREG por CD faturamento x nomenclatura da rota (aba Processar PDF) -->
 <script src="data/regra_carregamento.js"></script>
 
 <!-- Logica de extracao do PDF, normalizacao e geracao do Excel -->

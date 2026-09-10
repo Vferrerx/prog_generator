@@ -186,6 +186,42 @@ function resolveOrigemForRota(rota, fallback) {
 }
 
 /* ============================================================================
+ * RESOLUCAO DE ORIGEM - ABA OUTBACK (tabela exclusiva, ver
+ * data/prefixo_cd_transportadora_outback.js). Mantida totalmente separada da
+ * resolucao principal acima: alguns prefixos (ex: "RJ", "SP", "RS") tem
+ * CD/transportadora DIFERENTES entre as operacoes MCD e Outback, entao
+ * misturar as duas tabelas geraria origem/transportadora erradas para uma
+ * das duas operacoes.
+ * ==========================================================================*/
+const PLANILHA_FALLBACK_OUTBACK = 'Tbl_DistrOUTBACK_SEM_CADASTRO_Sem';
+
+let _prefixoLookupMapOutback = null;
+function getPrefixoLookupMapOutback() {
+  if (!_prefixoLookupMapOutback) {
+    _prefixoLookupMapOutback = new Map();
+    const table = (typeof PREFIXO_CD_TRANSPORTADORA_OUTBACK !== 'undefined' && PREFIXO_CD_TRANSPORTADORA_OUTBACK)
+      ? PREFIXO_CD_TRANSPORTADORA_OUTBACK
+      : (typeof global !== 'undefined' && global.PREFIXO_CD_TRANSPORTADORA_OUTBACK) || [];
+    table.forEach(e => _prefixoLookupMapOutback.set(String(e.prefixo).toUpperCase(), e));
+  }
+  return _prefixoLookupMapOutback;
+}
+function _resetPrefixoLookupMapOutbackForTests() { _prefixoLookupMapOutback = null; }
+
+function resolveOrigemPorPrefixoOutback(rota) {
+  const prefix = derivePrefixFromRota(rota);
+  return getPrefixoLookupMapOutback().get(prefix) || null;
+}
+
+function resolveOrigemForRotaOutback(rota, fallback) {
+  const info = resolveOrigemPorPrefixoOutback(rota);
+  if (info) {
+    return { origem: info.cd, transportadora: info.transportadora, planilha: info.planilha, fonte: 'tabela_prefixo', prefixo: info.prefixo };
+  }
+  return { origem: fallback, transportadora: null, planilha: PLANILHA_FALLBACK_OUTBACK, fonte: 'padrao', prefixo: derivePrefixFromRota(rota) };
+}
+
+/* ============================================================================
  * REGRA DE CARREGAMENTO POR NOMENCLATURA (DTHCARREG) - fonte unica: tabela de
  * regras em data/regra_carregamento.js (global REGRAS_CARREGAMENTO). Define,
  * conforme CD FATURAMENTO ("CD: XX" do PDF) + nomenclatura da rota (prefixo
@@ -257,9 +293,21 @@ function resolveRegraCarregamento(rota, cdFaturamento, origem) {
  * EXTRACAO DO PDF
  * ==========================================================================*/
 
+// Codigo de loja da aba Outback: aceita tanto o formato simples (2-6
+// letras/digitos) quanto o formato "MARCA-LOJA" usado nos PDFs Outback (ex:
+// "OUT-PSH", "ABB-PSH", "OUT-13M") - o formato simples original (usado pela
+// aba principal) NAO reconhece o hifen, por isso essas linhas eram
+// descartadas silenciosamente (nenhuma loja era extraida dos PDFs Outback).
+const LOJA_REGEX_OUTBACK = /^[A-Z0-9]{2,6}(-[A-Z0-9]{1,6})?$/;
+
 async function extractPdfRecords(pdfDoc, options, onProgress) {
   const opts = Object.assign({
-    cdFaturamentoDefault: 'FT'
+    cdFaturamentoDefault: 'FT',
+    // Codigo de loja padrao: 2-4 letras/digitos (ex: "SSH", "13M"). A aba
+    // Outback injeta um padrao mais permissivo (ver LOJA_REGEX_OUTBACK) pois
+    // usa codigos "MARCA-LOJA" (ex: "OUT-PSH") - isso nao altera o
+    // comportamento padrao desta funcao quando o parametro nao e informado.
+    lojaRegex: /^[A-Z0-9]{2,4}$/
   }, options || {});
 
   const records = [];
@@ -337,7 +385,7 @@ async function extractPdfRecords(pdfDoc, options, onProgress) {
       // sabados/domingos fossem descartadas silenciosamente.
       if (currentBlock && items.length >= 8 && Math.abs(items[0].x - 20) < 6) {
         const loja = items[0].str;
-        if (!/^[A-Z0-9]{2,4}$/.test(loja)) continue; // nao parece linha de loja valida
+        if (!opts.lojaRegex.test(loja)) continue; // nao parece linha de loja valida
 
         const parsedDia = parseDiaHoraToken(items, 1, 3);
         if (!parsedDia) continue;
@@ -402,7 +450,14 @@ async function extractPdfRecords(pdfDoc, options, onProgress) {
 
 function normalizeAndValidate(rawResult, options) {
   const opts = Object.assign({
-    origemFallback: DEFAULT_ORIGEM_FALLBACK
+    origemFallback: DEFAULT_ORIGEM_FALLBACK,
+    // Pontos de extensao usados pela aba Outback (tabela e regra de
+    // carregamento proprias) - por padrao apontam para as funcoes/arquivo da
+    // aba principal, entao chamar esta funcao sem estas opcoes mantem o
+    // comportamento exatamente como antes.
+    resolveOrigemFn: resolveOrigemForRota,
+    resolveRegraCarregamentoFn: resolveRegraCarregamento,
+    arquivoTabelaReferencia: 'data/prefixo_cd_transportadora.js'
   }, options || {});
 
   const normalized = [];
@@ -425,12 +480,12 @@ function normalizeAndValidate(rawResult, options) {
     if (dowDigit == null) rowErrors.push(`Dia da semana de entrega invalido: "${rec.diaSemanaEntrega}"`);
     if (!hEntrega) rowErrors.push(`Hora de entrega invalida: "${rec.horaEntregaStr}"`);
 
-    const origemInfo = resolveOrigemForRota(rec.rota, opts.origemFallback);
+    const origemInfo = opts.resolveOrigemFn(rec.rota, opts.origemFallback);
     const origem = origemInfo.origem;
     const tipoOperacao = `DISTR ${origem}`;
 
     if (origemInfo.fonte === 'padrao') {
-      warnings.push({ type: 'prefixo_nao_cadastrado', rota: rec.rota, loja: rec.loja, detail: `Prefixo "${origemInfo.prefixo}" (rota "${rec.rota}") nao consta na tabela de referencia de CD/transportadora; usando origem padrao (${origem}). Atualize a tabela em "data/prefixo_cd_transportadora.js" se este prefixo for valido.` });
+      warnings.push({ type: 'prefixo_nao_cadastrado', rota: rec.rota, loja: rec.loja, detail: `Prefixo "${origemInfo.prefixo}" (rota "${rec.rota}") nao consta na tabela de referencia de CD/transportadora; usando origem padrao (${origem}). Atualize a tabela em "${opts.arquivoTabelaReferencia}" se este prefixo for valido.` });
     }
 
     let dataFaturamento = null, dataEntrega = null, dataCarregamento = null;
@@ -454,7 +509,7 @@ function normalizeAndValidate(rawResult, options) {
     // quando a DATA DE ENTREGA foi determinada e uma regra casa com esta rota
     // (ver data/regra_carregamento.js). Caso contrario, mantem a preliminar.
     if (dataEntrega) {
-      const regra = resolveRegraCarregamento(rec.rota, rec.cdFaturamento, origem);
+      const regra = opts.resolveRegraCarregamentoFn(rec.rota, rec.cdFaturamento, origem);
       if (regra) {
         dataCarregamento = new Date(dataEntrega.getTime() - (regra.diasAntesEntrega || 0) * 86400000);
         hCarreg = parseHourMinute(regra.hora);
@@ -931,6 +986,8 @@ if (typeof module !== 'undefined') {
     brDowToJsDow, parseBRDateShortYear, makeUTCDate, resolveWeekdayDate, parseHourMinute, parseDiaSemanaToken, parseDiaHoraToken,
     parseBRNumber, resolveOrigemForRota, resolveOrigemPorPrefixo, DEFAULT_ORIGEM_FALLBACK, PLANILHA_FALLBACK,
     derivePrefixFromRota, getPrefixoLookupMap, _resetPrefixoLookupMapForTests,
+    resolveOrigemForRotaOutback, resolveOrigemPorPrefixoOutback, getPrefixoLookupMapOutback,
+    _resetPrefixoLookupMapOutbackForTests, PLANILHA_FALLBACK_OUTBACK, LOJA_REGEX_OUTBACK,
     resolveRegraCarregamento, findRegraCarregamentoPorNomenclatura, wildcardPatternToRegex,
     getRegrasCarregamento, _resetRegrasCarregamentoCacheForTests,
     bucketNumericItemsByCategoryX, resolveCategoryValues,
