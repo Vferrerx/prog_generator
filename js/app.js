@@ -86,6 +86,7 @@ function initNav() {
 function createCtx(cfg) {
   const s = cfg.idSuffix || '';
   return {
+    idSuffix: s,
     extractFn: cfg.extractFn,
     extractOpts: cfg.extractOpts || {},
     resolveOrigemFn: cfg.resolveOrigemFn,
@@ -421,10 +422,21 @@ async function gerarExcels(ctx) {
       ctx.state.excelFiles.push({ fileName: grupo.fileName, blob, count: grupo.records.length });
     }
 
+    // Arquivo consolidado: mesma logica/modelo de buildExcelWorkbook, mas com
+    // TODOS os registros (de todos os grupos) numa unica planilha, gerado
+    // junto dos demais arquivos - nao substitui nenhum dos arquivos por grupo.
+    const semana = grupos.length ? grupos[0].semana : '';
+    const consolidadoBase = ctx.idSuffix === 'Otb' ? 'Consolidado_Outback' : 'Consolidado';
+    const consolidadoFileName = semana !== '' ? `${consolidadoBase}_Sem${semana}.xlsx` : `${consolidadoBase}.xlsx`;
+    const resultConsolidado = await buildExcelWorkbook(modelBuffer, allRecords, {});
+    const outBufferConsolidado = await resultConsolidado.workbook.xlsx.writeBuffer();
+    const blobConsolidado = new Blob([outBufferConsolidado], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    ctx.state.excelFiles.push({ fileName: consolidadoFileName, blob: blobConsolidado, count: allRecords.length });
+
     statusEl.classList.add('ok');
     statusEl.textContent = grupos.length === 1
-      ? `Excel gerado com sucesso (${allRecords.length} linha(s)).`
-      : `${grupos.length} planilhas geradas com sucesso (${allRecords.length} linha(s) no total, semana ${grupos[0].semana}).`;
+      ? `Excel gerado com sucesso (${allRecords.length} linha(s)) + arquivo consolidado.`
+      : `${grupos.length} planilhas geradas com sucesso (${allRecords.length} linha(s) no total, semana ${grupos[0].semana}) + arquivo consolidado.`;
 
     renderDownloadList(ctx, ctx.state.excelFiles);
     ctx.dom.downloadSection.hidden = false;
