@@ -86,6 +86,7 @@ function initNav() {
 function createCtx(cfg) {
   const s = cfg.idSuffix || '';
   return {
+    idSuffix: s,
     extractFn: cfg.extractFn,
     extractOpts: cfg.extractOpts || {},
     resolveOrigemFn: cfg.resolveOrigemFn,
@@ -419,6 +420,18 @@ async function gerarExcels(ctx) {
       const outBuffer = await result.workbook.xlsx.writeBuffer();
       const blob = new Blob([outBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       ctx.state.excelFiles.push({ fileName: grupo.fileName, blob, count: grupo.records.length });
+    }
+
+    // Arquivo consolidado extra, com todos os registros de todos os grupos
+    // juntos numa unica planilha - gerado ao lado dos arquivos por grupo
+    // (so faz sentido quando ha mais de um grupo; com um so grupo ele seria
+    // identico ao arquivo ja gerado acima).
+    if (grupos.length > 1) {
+      const nomeConsolidado = ctx.idSuffix ? `Consolidado_Outback_Sem${grupos[0].semana}.xlsx` : `Consolidado_Sem${grupos[0].semana}.xlsx`;
+      const resultConsolidado = await buildExcelWorkbook(modelBuffer, allRecords, {});
+      const outBufferConsolidado = await resultConsolidado.workbook.xlsx.writeBuffer();
+      const blobConsolidado = new Blob([outBufferConsolidado], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      ctx.state.excelFiles.push({ fileName: nomeConsolidado, blob: blobConsolidado, count: allRecords.length });
     }
 
     statusEl.classList.add('ok');
