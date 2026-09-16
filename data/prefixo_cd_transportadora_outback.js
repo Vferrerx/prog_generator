@@ -19,8 +19,10 @@ const PREFIXO_CD_TRANSPORTADORA_OUTBACK = [
   { prefixo: "RJ", cd: "CDRJ", transportadora: "LOGMAM", planilha: "Tbl_DistrOUTBACK_Sem" },
   { prefixo: "VP", cd: "CDJC", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
   { prefixo: "SP", cd: "CDJC", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
+  { prefixo: "LT", cd: "CDJC", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
   { prefixo: "RS", cd: "CDRS", transportadora: "PRODELOG", planilha: "Tbl_DistrOUTBACK_Sem" },
   { prefixo: "NP", cd: "CDPR", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
+  { prefixo: "SC", cd: "CDPR", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
   { prefixo: "PN", cd: "CDPR", transportadora: "MARTIN BROWER", planilha: "Tbl_DistrOUTBACK_Sem" },
 ];
 
