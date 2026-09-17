@@ -52,8 +52,71 @@ function ensureLibsLoaded() {
 }
 
 /* ============================================================================
- * NAVEGACAO: Processar PDF <-> Outback <-> Configuracoes (engrenagem)
+ * ATALHOS DE REDE - copia para a area de transferencia o caminho da pasta de
+ * preliminar/definitiva de cada CD de faturamento. O mes/ano do caminho e
+ * sempre calculado a partir da data atual do PC (nao fica hardcoded), entao
+ * o botao continua correto automaticamente a cada mes.
+ * Nao e possivel abrir o Explorador de Arquivos do Windows direto por um
+ * botao de pagina web - navegadores modernos bloqueiam esse tipo de acesso
+ * ao sistema operacional por seguranca (ainda mais em caminho de rede\\UNC).
+ * A alternativa padrao e essa: copiar o caminho e colar no Explorador.
  * ==========================================================================*/
+const NETWORK_PATHS = {
+  FT: { label: 'FT', base: 'G:\\TRAFEGO\\TRANSPORTES\\PRELIMINAR CD FT' },
+  JC_SP: { label: 'JC (faturamento SP)', base: 'G:\\TRAFEGO\\CDJC\\Preliminar', sub: '01. sp' },
+  JC_RJ: { label: 'JC (faturamento RJ)', base: 'G:\\TRAFEGO\\CDJC\\Preliminar', sub: '02. rj' },
+  NE: { label: 'NE', base: 'G:\\TRAFEGO\\CDNE' },
+  PR: { label: 'PR', base: 'G:\\TRAFEGO\\CDPR' }
+};
+
+function buildNetworkPath(entry) {
+  const now = new Date();
+  const ano = String(now.getFullYear());
+  const mes = String(now.getMonth() + 1).padStart(2, '0');
+  const anoCurto = ano.slice(-2);
+  const partes = [entry.base, ano];
+  if (entry.sub) partes.push(entry.sub);
+  partes.push(`${mes}.${anoCurto}`);
+  return partes.join('\\');
+}
+
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback para contextos sem Clipboard API (ex: http sem TLS)
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy') ? resolve() : reject(new Error('execCommand falhou'));
+    } catch (err) {
+      reject(err);
+    } finally {
+      ta.remove();
+    }
+  });
+}
+
+function initNetworkShortcuts() {
+  $all('.shortcut-btn[data-network]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = NETWORK_PATHS[btn.dataset.network];
+      if (!entry) return;
+      const path = buildNetworkPath(entry);
+      copyTextToClipboard(path)
+        .then(() => showToast(`Caminho copiado (${entry.label}): ${path}`, 'success'))
+        .catch(() => showToast('Não foi possível copiar automaticamente. Caminho: ' + path, 'error'));
+    });
+  });
+}
+
+
 function initNav() {
   const pages = { processar: $('#pageProcessar'), outback: $('#pageOutback'), config: $('#pageConfig') };
   const tabProcessarBtn = $('#tabProcessarBtn');
@@ -632,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDropzone(ctxOutback);
   initConfigPage();
   initOutbackSettings();
+  initNetworkShortcuts();
 
   ctxProcessar.dom.btnProcessar.addEventListener('click', () => processarPdfs(ctxProcessar));
   ctxProcessar.dom.btnGerar.addEventListener('click', () => gerarExcels(ctxProcessar));
